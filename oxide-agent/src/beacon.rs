@@ -108,9 +108,12 @@ pub async fn run(cfg: AgentConfig) -> Result<()> {
             // cfg.sleep_ms = new_ms; // cfg is immutable; rebuild config
         }
 
-        // Execute tasks asynchronously
+        // Execute tasks
         for task in resp.tasks {
+            crate::dbg_log!("executing task {} cmd={} args={:?}", task.id, task.command, task.args);
             let result = execute_task(&task).await;
+            crate::dbg_log!("task {} done — output={} bytes, err={:?}",
+                task.id, result.output.len(), result.error);
             pending_results.push(result);
         }
     }
