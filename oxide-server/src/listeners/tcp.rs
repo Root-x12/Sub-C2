@@ -14,9 +14,9 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 pub async fn run(cfg: ListenerConfig, state: AppState) -> anyhow::Result<()> {
-    let addr = format!("{}:{}", cfg.host, cfg.port);
+    let addr = format!("0.0.0.0:{}", cfg.port);
     let listener = TcpListener::bind(&addr).await?;
-    info!("TCP listener on tcp://{addr}");
+    info!("TCP listener on tcp://{}:{}", cfg.host, cfg.port);
 
     loop {
         match listener.accept().await {

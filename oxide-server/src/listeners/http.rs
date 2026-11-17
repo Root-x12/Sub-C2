@@ -23,8 +23,9 @@ pub async fn run(cfg: ListenerConfig, state: AppState) -> anyhow::Result<()> {
         .route("/beacon/:agent_id", post(handle_beacon))
         .with_state(state);
 
+    // Always bind on all interfaces; cfg.host is the advertised address for agents
     let addr: std::net::SocketAddr =
-        format!("{}:{}", cfg.host, cfg.port).parse()?;
+        format!("0.0.0.0:{}", cfg.port).parse()?;
 
     info!("HTTP listener on http://{addr}");
     let listener = tokio::net::TcpListener::bind(addr).await?;
