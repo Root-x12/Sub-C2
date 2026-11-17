@@ -19,14 +19,22 @@ struct Args {
     #[arg(short, long, default_value = "ws://127.0.0.1:7878/ws")]
     server: String,
 
-    /// Auth token
+    /// Auth token (auto-read from oxide-server.toml if omitted)
     #[arg(short, long)]
-    token: String,
+    token: Option<String>,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
+    let token = match args.token {
+        Some(t) => t,
+        None => read_token_from_toml()
+            .ok_or_else(|| anyhow::anyhow!(
+                "No --token given and could not read oxide-server.toml. \
+                 Run oxide-server first or pass --token <token>."
+            ))?,
+    };
 
     // Setup terminal
     enable_raw_mode()?;
@@ -35,7 +43,7 @@ async fn main() -> Result<()> {
     let backend  = CrosstermBackend::new(stdout);
     let mut term = Terminal::new(backend)?;
 
-    let res = run(&mut term, &args.server, &args.token).await;
+    let res = run(&mut term, &args.server, &token).await;
 
     // Restore terminal
     disable_raw_mode()?;
@@ -46,6 +54,20 @@ async fn main() -> Result<()> {
         eprintln!("Error: {e}");
     }
     Ok(())
+}
+
+fn read_token_from_toml() -> Option<String> {
+    let content = std::fs::read_to_string("oxide-server.toml").ok()?;
+    for line in content.lines() {
+        let line = line.trim();
+        if let Some(rest) = line.strip_prefix("operator_token") {
+            let rest = rest.trim_start_matches([' ', '=', '"']).trim_end_matches('"');
+            if !rest.is_empty() {
+                return Some(rest.to_string());
+            }
+        }
+    }
+    None
 }
 
 async fn run<B: ratatui::backend::Backend>(
