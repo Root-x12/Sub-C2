@@ -88,8 +88,9 @@ async fn handle_beacon(
         }
     }
 
-    // Push results to operators
-    for result in beacon.results {
+    // Push results to operators (fill in agent_id from URL path)
+    for mut result in beacon.results {
+        result.agent_id = agent_id;
         let _ = state.0.read().await.broadcast
             .send(SrvMessage::TaskResult { result });
     }
