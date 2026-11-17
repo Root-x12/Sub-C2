@@ -1,78 +1,177 @@
 use crate::app::App;
-use crate::ui::{C_ACCENT, C_BORDER, C_DIM, C_DANGER, C_FG, C_OK, C_WARN};
+use crate::ui::{C_ACCENT, C_BORDER, C_DIM, C_DANGER, C_FG, C_LABEL, C_OK, C_SELECT, C_WARN};
+use oxide_common::types::{AgentStatus, Privilege};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Row, Table, TableState},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame,
 };
 
 pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(0), Constraint::Length(2)])
+    let panes = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(38), Constraint::Percentage(62)])
         .split(area);
 
-    let header_cells = ["ID", "Hostname", "IP", "User", "OS", "Privilege", "PID", "Sleep", "Status"]
+    draw_list(f, app, panes[0]);
+    draw_detail(f, app, panes[1]);
+}
+
+fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
+    let filter = app.filter.to_lowercase();
+    let filtered: Vec<(usize, &oxide_common::types::AgentInfo)> = app.agents
         .iter()
-        .map(|h| Cell::from(*h).style(Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD)));
-    let header = Row::new(header_cells).height(1);
+        .enumerate()
+        .filter(|(_, a)| filter.is_empty() || a.hostname.to_lowercase().contains(&filter))
+        .collect();
 
-    let rows: Vec<Row> = app.agents.iter().map(|a| {
-        let priv_color = match a.privilege {
-            oxide_common::types::Privilege::System => C_DANGER,
-            oxide_common::types::Privilege::Admin  => C_WARN,
-            oxide_common::types::Privilege::User   => C_OK,
+    // Build list items — numbered, with status dot and privilege
+    let items: Vec<ListItem> = filtered.iter().map(|(real_idx, a)| {
+        let dot_color = match a.status {
+            AgentStatus::Active => C_OK,
+            AgentStatus::Stale  => C_WARN,
+            AgentStatus::Dead   => C_DIM,
         };
-        let status_color = match a.status {
-            oxide_common::types::AgentStatus::Active => C_OK,
-            oxide_common::types::AgentStatus::Stale  => C_WARN,
-            oxide_common::types::AgentStatus::Dead   => C_DANGER,
+        let (priv_str, priv_color) = match a.privilege {
+            Privilege::System => (" SYSTEM", C_DANGER),
+            Privilege::Admin  => ("  ADMIN", C_WARN),
+            Privilege::User   => ("   USER", C_FG),
         };
-        Row::new(vec![
-            Cell::from(a.id.to_string().chars().take(8).collect::<String>()).style(Style::default().fg(C_DIM)),
-            Cell::from(a.hostname.as_str()).style(Style::default().fg(C_FG).add_modifier(Modifier::BOLD)),
-            Cell::from(a.ip.as_str()).style(Style::default().fg(C_DIM)),
-            Cell::from(a.username.as_str()).style(Style::default().fg(C_FG)),
-            Cell::from(a.os.as_str()).style(Style::default().fg(C_DIM)),
-            Cell::from(a.privilege.to_string()).style(Style::default().fg(priv_color).add_modifier(Modifier::BOLD)),
-            Cell::from(a.pid.to_string()).style(Style::default().fg(C_DIM)),
-            Cell::from(format!("{}ms", a.sleep_ms)).style(Style::default().fg(C_DIM)),
-            Cell::from(a.status.to_string()).style(Style::default().fg(status_color)),
+        // Show number in original list order +1
+        let num = *real_idx + 1;
+        Line::from(vec![
+            Span::styled(format!(" {:>2} ", num), Style::default().fg(C_DIM)),
+            Span::styled("● ", Style::default().fg(dot_color)),
+            Span::styled(
+                format!("{:<18}", &a.hostname),
+                Style::default().fg(C_FG).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(priv_str, Style::default().fg(priv_color)),
         ])
-    }).collect();
+    }).map(|line| ListItem::new(line)).collect();
 
-    let count = app.agents.len();
-    let table = Table::new(
-            rows,
-            [
-                Constraint::Length(10),
-                Constraint::Percentage(20),
-                Constraint::Length(16),
-                Constraint::Percentage(15),
-                Constraint::Percentage(10),
-                Constraint::Length(8),
-                Constraint::Length(7),
-                Constraint::Length(8),
-                Constraint::Length(8),
-            ],
-        )
-        .header(header)
+    // Map selected_agent (index in app.agents) to index in filtered list
+    let filtered_sel = app.selected_agent.and_then(|sel| {
+        filtered.iter().position(|(ri, _)| *ri == sel)
+    });
+
+    let filter_hint = if app.filter_active {
+        format!(" /{}_", app.filter)
+    } else if !app.filter.is_empty() {
+        format!(" /{} ", app.filter)
+    } else {
+        String::new()
+    };
+
+    let title = if filter_hint.is_empty() {
+        format!(" Agents ({}) ", filtered.len())
+    } else {
+        format!(" Agents ({})  {} ", filtered.len(), filter_hint)
+    };
+
+    let list = List::new(items)
         .block(Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(C_BORDER))
-            .title(format!(" Agents ({count}) — ↑↓ select, Enter interact ")));
+            .title(Span::styled(title, Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD))))
+        .highlight_style(
+            Style::default()
+                .bg(Color::Rgb(90, 20, 20))
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("▶ ");
 
-    let mut state = TableState::default();
-    state.select(app.selected_agent);
-    f.render_stateful_widget(table, chunks[0], &mut state);
+    let mut state = ListState::default();
+    state.select(filtered_sel);
+    f.render_stateful_widget(list, area, &mut state);
+}
 
-    // Status bar
-    let help = Line::from(vec![
-        Span::styled(" [↑↓] select  ", Style::default().fg(C_DIM)),
-        Span::styled("[Enter] interact  ", Style::default().fg(C_ACCENT)),
-        Span::styled("[Tab] switch tab  ", Style::default().fg(C_DIM)),
-    ]);
-    f.render_widget(ratatui::widgets::Paragraph::new(help), chunks[1]);
+fn draw_detail(f: &mut Frame, app: &App, area: Rect) {
+    let agent = app.selected_agent.and_then(|i| app.agents.get(i));
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(C_BORDER))
+        .title(Span::styled(
+            agent.map(|a| format!(" {} ", a.hostname)).unwrap_or_else(|| " — ".into()),
+            Style::default().fg(C_SELECT).add_modifier(Modifier::BOLD),
+        ));
+
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    if let Some(a) = agent {
+        let (priv_str, priv_color) = match a.privilege {
+            Privilege::System => ("SYSTEM", C_DANGER),
+            Privilege::Admin  => ("ADMIN",  C_WARN),
+            Privilege::User   => ("USER",   C_OK),
+        };
+        let (status_str, status_color) = match a.status {
+            AgentStatus::Active => ("ACTIVE", C_OK),
+            AgentStatus::Stale  => ("STALE",  C_WARN),
+            AgentStatus::Dead   => ("DEAD",   C_DANGER),
+        };
+
+        let kv = |k: &'static str, v: String| -> Line<'static> {
+            Line::from(vec![
+                Span::styled(format!("  {:<13}: ", k), Style::default().fg(C_LABEL)),
+                Span::styled(v, Style::default().fg(C_FG)),
+            ])
+        };
+        let kv_col = |k: &'static str, v: &'static str, color: Color| -> Line<'static> {
+            Line::from(vec![
+                Span::styled(format!("  {:<13}: ", k), Style::default().fg(C_LABEL)),
+                Span::styled(v, Style::default().fg(color).add_modifier(Modifier::BOLD)),
+            ])
+        };
+
+        let last_seen = a.last_seen.format("%H:%M:%S").to_string();
+        let first_seen = a.first_seen.format("%H:%M:%S").to_string();
+        let sleep = format!("{}ms (±{}%)", a.sleep_ms, a.jitter_pct);
+        let domain = a.domain.clone().unwrap_or_else(|| "—".into());
+
+        let lines = vec![
+            Line::from(""),
+            kv("Hostname",   a.hostname.clone()),
+            kv("Username",   a.username.clone()),
+            kv("Domain",     domain),
+            kv("IP",         a.ip.clone()),
+            kv("OS",         a.os.clone()),
+            kv("Arch",       a.arch.clone()),
+            kv("PID",        a.pid.to_string()),
+            kv_col("Privilege", priv_str, priv_color),
+            kv_col("Status",    status_str, status_color),
+            kv("Sleep",      sleep),
+            kv("First Seen", first_seen),
+            kv("Last Seen",  last_seen),
+            Line::from(""),
+            Line::from(Span::styled(
+                "  ─────────────────────────────────────────────",
+                Style::default().fg(C_DIM),
+            )),
+            Line::from(""),
+            Line::from(vec![
+                Span::styled("  [Enter]", Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD)),
+                Span::styled(" interact   ", Style::default().fg(C_DIM)),
+                Span::styled("[/]", Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD)),
+                Span::styled(" filter   ", Style::default().fg(C_DIM)),
+                Span::styled("[↑↓]", Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD)),
+                Span::styled(" select", Style::default().fg(C_DIM)),
+            ]),
+        ];
+
+        let para = Paragraph::new(lines);
+        f.render_widget(para, inner);
+    } else {
+        let hint = Paragraph::new(Line::from(vec![
+            Span::styled(
+                "\n  No agents connected. Build and deploy an agent to get started.",
+                Style::default().fg(C_DIM),
+            ),
+        ]));
+        f.render_widget(hint, inner);
+    }
 }

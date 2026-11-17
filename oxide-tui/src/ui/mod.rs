@@ -6,7 +6,7 @@ mod loot;
 mod modals;
 mod sessions;
 
-use crate::app::{App, Modal, Tab};
+use crate::app::{App, Tab};
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
@@ -17,6 +17,8 @@ use ratatui::{
 
 // ── Colour palette ────────────────────────────────────────────────────────────
 pub const C_ACCENT:  Color = Color::Cyan;
+pub const C_SELECT:  Color = Color::LightRed;   // parui-style selection highlight
+pub const C_LABEL:   Color = Color::Yellow;      // key labels in detail cards
 pub const C_OK:      Color = Color::Green;
 pub const C_WARN:    Color = Color::Yellow;
 pub const C_DANGER:  Color = Color::Red;
@@ -28,10 +30,9 @@ pub const C_BORDER:  Color = Color::DarkGray;
 pub fn draw(f: &mut Frame, app: &mut App) {
     let area = f.area();
 
-    // ── Root split: tab bar (3) + content (rest)
     let root = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(0)])
+        .constraints([Constraint::Length(3), Constraint::Min(0), Constraint::Length(1)])
         .split(area);
 
     draw_tabs(f, app, root[0]);
@@ -44,6 +45,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Tab::Loot      => loot::draw(f, app, root[1]),
         Tab::Build     => draw_build(f, app, root[1]),
     }
+
+    draw_statusbar(f, app, root[2]);
 
     // Overlay modals last
     if let Some(modal) = &app.modal.clone() {
@@ -80,11 +83,37 @@ fn draw_tabs(f: &mut Frame, app: &App, area: Rect) {
     f.render_widget(tabs, area);
 }
 
-fn draw_build(f: &mut Frame, app: &App, area: Rect) {
-    use ratatui::{
-        text::Text,
-        widgets::Paragraph,
+fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
+    use ratatui::widgets::Paragraph;
+
+    let agents  = app.agents.len();
+    let active  = app.agents.iter().filter(|a| a.status == oxide_common::types::AgentStatus::Active).count();
+    let listeners = app.listeners.iter().filter(|l| l.status == oxide_common::types::ListenerStatus::Running).count();
+
+    let filter_hint = if app.filter_active {
+        format!(" Filter: {} ", app.filter)
+    } else if !app.filter.is_empty() {
+        format!(" /{} ", app.filter)
+    } else {
+        String::new()
     };
+
+    let line = Line::from(vec![
+        Span::styled(format!(" Agents: {active}/{agents} "), Style::default().fg(C_OK)),
+        Span::styled("│", Style::default().fg(C_DIM)),
+        Span::styled(format!(" Listeners: {listeners} "), Style::default().fg(C_ACCENT)),
+        Span::styled("│", Style::default().fg(C_DIM)),
+        Span::styled(" [/] filter  [Tab] switch  [q] quit ", Style::default().fg(C_DIM)),
+        Span::styled(filter_hint, Style::default().fg(C_SELECT).add_modifier(Modifier::BOLD)),
+    ]);
+
+    let para = Paragraph::new(line)
+        .style(Style::default().bg(Color::Black));
+    f.render_widget(para, area);
+}
+
+fn draw_build(f: &mut Frame, app: &App, area: Rect) {
+    use ratatui::{text::Text, widgets::Paragraph};
 
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -93,15 +122,20 @@ fn draw_build(f: &mut Frame, app: &App, area: Rect) {
         .split(area);
 
     let content = vec![
+        Line::from(""),
         Line::from(vec![
-            Span::styled("  Press ", Style::default().fg(C_DIM)),
+            Span::styled("   Press ", Style::default().fg(C_DIM)),
             Span::styled("[G]", Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD)),
             Span::styled(" to open the Payload Generator", Style::default().fg(C_FG)),
         ]),
         Line::from(""),
+        Line::from(vec![
+            Span::styled("   The generator will cross-compile an ", Style::default().fg(C_DIM)),
+            Span::styled("oxide-agent.exe", Style::default().fg(C_ACCENT)),
+            Span::styled(" for Windows x64", Style::default().fg(C_DIM)),
+        ]),
     ];
 
-    // Build status
     if let Some(ref status) = app.build_status {
         let color = if status.starts_with("FAILED") { C_DANGER }
                     else if status.starts_with("Done") { C_OK }
@@ -109,13 +143,13 @@ fn draw_build(f: &mut Frame, app: &App, area: Rect) {
 
         let para = Paragraph::new(Text::from(vec![
             Line::from(vec![
-                Span::styled("  Status: ", Style::default().fg(C_DIM)),
+                Span::styled("   Status: ", Style::default().fg(C_DIM)),
                 Span::styled(status.as_str(), Style::default().fg(color).add_modifier(Modifier::BOLD)),
             ]),
         ]))
         .block(Block::default().borders(Borders::ALL)
             .title(" Build Status ")
-            .border_style(Style::default().fg(C_BORDER)));
+            .border_style(Style::default().fg(color)));
         f.render_widget(para, chunks[1]);
     }
 

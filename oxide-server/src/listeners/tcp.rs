@@ -100,7 +100,8 @@ async fn handle_conn(mut stream: TcpStream, state: AppState) -> anyhow::Result<(
                 }
             }
 
-            for result in beacon.results {
+            for mut result in beacon.results {
+                result.agent_id = aid;
                 let _ = state.0.read().await.broadcast
                     .send(SrvMessage::TaskResult { result });
             }
