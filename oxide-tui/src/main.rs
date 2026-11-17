@@ -84,21 +84,23 @@ async fn run<B: ratatui::backend::Backend>(
     app.send_op(oxide_common::protocol::OpMessage::ListLoot).await;
 
     let mut event_stream = crossterm::event::EventStream::new();
+    let mut ticker = tokio::time::interval(std::time::Duration::from_millis(500));
     use futures::StreamExt;
 
     loop {
         term.draw(|f| ui::draw(f, &mut app))?;
 
         tokio::select! {
-            // Keyboard / mouse events
             Some(Ok(evt)) = event_stream.next() => {
                 if app.handle_event(evt).await? {
-                    break; // quit signal
+                    break;
                 }
             }
-            // Server messages
             Some(msg) = ws_rx.recv() => {
                 app.handle_server_message(msg);
+            }
+            _ = ticker.tick() => {
+                app.tick();
             }
         }
     }

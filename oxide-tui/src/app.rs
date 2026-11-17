@@ -215,6 +215,9 @@ pub struct App {
     // Filter string (press '/' to activate)
     pub filter:             String,
     pub filter_active:      bool,
+    pub beacon_history:     VecDeque<u64>,
+    pub tick_count:         u64,
+    pub beacons_this_sec:   u64,
 }
 
 impl App {
@@ -245,11 +248,25 @@ impl App {
             pending_task_agents:  HashMap::new(),
             filter:               String::new(),
             filter_active:        false,
+            beacon_history:       VecDeque::with_capacity(60),
+            tick_count:           0,
+            beacons_this_sec:     0,
         }
     }
 
     pub async fn send_op(&self, op: OpMessage) {
         let _ = self.ws_tx.send(op).await;
+    }
+
+    pub fn tick(&mut self) {
+        self.tick_count = self.tick_count.wrapping_add(1);
+        if self.tick_count % 2 == 0 {
+            if self.beacon_history.len() >= 60 {
+                self.beacon_history.pop_front();
+            }
+            self.beacon_history.push_back(self.beacons_this_sec);
+            self.beacons_this_sec = 0;
+        }
     }
 
     pub fn push_log(&mut self, msg: impl Into<String>) {
@@ -288,6 +305,7 @@ impl App {
                 self.rebuild_graph();
             }
             SrvMessage::AgentUpdate { agent } => {
+                self.beacons_this_sec += 1;
                 if let Some(a) = self.agents.iter_mut().find(|a| a.id == agent.id) {
                     *a = agent;
                 }
