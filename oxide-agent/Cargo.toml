@@ -1,0 +1,59 @@
+[package]
+name    = "oxide-agent"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "oxide-agent"
+path = "src/main.rs"
+
+[lib]
+name       = "oxide_agent"
+path       = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[build-dependencies]
+rand         = "0.8"
+hex          = "0.4"
+serde_json   = "1"
+chrono       = "0.4"
+
+[dependencies]
+oxide-common = { path = "../oxide-common" }
+oxide-macros = { path = "../oxide-macros" }
+tokio        = { version = "1", features = ["full"] }
+serde        = { version = "1", features = ["derive"] }
+serde_json   = "1"
+anyhow       = "1"
+rand         = "0.8"
+hex          = "0.4"
+uuid         = { version = "1", features = ["v4"] }
+reqwest      = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+chacha20poly1305 = "0.10"
+x25519-dalek     = { version = "2" }
+sha2             = "0.10"
+hkdf             = "0.12"
+chrono           = "0.4"
+tokio-util       = { version = "0.7", features = ["codec"] }
+bytes            = "1"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+    "Win32_System_Memory",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_SystemInformation",
+    "Win32_System_LibraryLoader",
+    "Win32_Security",
+    "Win32_Security_Cryptography",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Pipes",
+    "Win32_System_IO",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_Networking_WinSock",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Storage_FileSystem",
+] }

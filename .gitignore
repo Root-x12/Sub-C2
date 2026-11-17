@@ -1,0 +1,8 @@
+target/
+*.exe
+*.dll
+*.bin
+*.pdb
+oxide-server.toml
+oxide-server.db
+/dist/

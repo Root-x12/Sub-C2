@@ -1,0 +1,40 @@
+[package]
+name    = "oxide-server"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "oxide-server"
+path = "src/main.rs"
+
+[dependencies]
+oxide-common = { path = "../oxide-common" }
+tokio        = { workspace = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
+uuid         = { workspace = true }
+rand         = { workspace = true }
+anyhow       = { workspace = true }
+tracing      = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono       = { workspace = true }
+hex          = { workspace = true }
+
+axum        = { version = "0.7", features = ["ws", "macros"] }
+tower       = "0.4"
+tower-http  = { version = "0.5", features = ["cors", "trace"] }
+tokio-util  = { version = "0.7", features = ["codec"] }
+bytes       = "1"
+futures     = "0.3"
+
+rcgen          = "0.13"
+rustls         = { version = "0.23", features = ["ring"] }
+rustls-pemfile = "2"
+tokio-rustls   = "0.26"
+axum-server    = { version = "0.7", features = ["tls-rustls"] }
+
+sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio", "chrono", "uuid", "macros"] }
+
+clap  = { version = "4", features = ["derive"] }
+toml  = "0.8"
+x25519-dalek = { version = "2" }
