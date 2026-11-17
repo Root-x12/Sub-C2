@@ -34,13 +34,13 @@ pub async fn dpapi(args: &[String]) -> Result<String> {
 #[cfg(target_os = "windows")]
 fn dpapi_decrypt(blob: &[u8]) -> Result<String> {
     use windows_sys::Win32::Security::Cryptography::CryptUnprotectData;
-    use windows_sys::Win32::Security::Cryptography::CRYPTOAPI_BLOB;
+    use windows_sys::Win32::Security::Cryptography::CRYPT_INTEGER_BLOB;
     unsafe {
-        let mut input = CRYPTOAPI_BLOB {
+        let mut input = CRYPT_INTEGER_BLOB {
             cbData: blob.len() as u32,
             pbData: blob.as_ptr() as *mut u8,
         };
-        let mut output = CRYPTOAPI_BLOB { cbData: 0, pbData: std::ptr::null_mut() };
+        let mut output = CRYPT_INTEGER_BLOB { cbData: 0, pbData: std::ptr::null_mut() };
         if CryptUnprotectData(&mut input, std::ptr::null_mut(), std::ptr::null_mut(),
                               std::ptr::null_mut(), std::ptr::null_mut(), 0,
                               &mut output) != 0 {

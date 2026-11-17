@@ -151,7 +151,7 @@ fn current_privilege() -> Privilege {
     #[cfg(target_os = "windows")]
     {
         unsafe {
-            use windows_sys::Win32::Security::IsUserAnAdmin;
+            use windows_sys::Win32::UI::Shell::IsUserAnAdmin;
             if IsUserAnAdmin() != 0 {
                 return Privilege::Admin;
             }

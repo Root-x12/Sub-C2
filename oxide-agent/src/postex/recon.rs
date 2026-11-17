@@ -131,9 +131,9 @@ fn screenshot_windows() -> Result<String> {
     use windows_sys::Win32::Graphics::Gdi::{
         BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC,
         DeleteObject, GetDIBits, GetDC, ReleaseDC, SelectObject,
-        BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
-        GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN, SRCCOPY,
+        BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, SRCCOPY,
     };
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
     unsafe {
         let w = GetSystemMetrics(SM_CXSCREEN);
         let h = GetSystemMetrics(SM_CYSCREEN);

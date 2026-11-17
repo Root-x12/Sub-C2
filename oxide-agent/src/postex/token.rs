@@ -24,8 +24,9 @@ fn steal_windows(pid: u32) -> Result<String> {
         },
         System::Threading::{
             OpenProcess, OpenProcessToken,
-            PROCESS_QUERY_INFORMATION, TOKEN_DUPLICATE, TOKEN_IMPERSONATE, TOKEN_QUERY,
+            PROCESS_QUERY_INFORMATION,
         },
+        Security::{TOKEN_DUPLICATE, TOKEN_IMPERSONATE, TOKEN_QUERY},
     };
     unsafe {
         let proc = OpenProcess(PROCESS_QUERY_INFORMATION, 0, pid);

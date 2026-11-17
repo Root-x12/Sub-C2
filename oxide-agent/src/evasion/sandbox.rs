@@ -69,7 +69,7 @@ fn check_debugger() -> bool {
 
 #[cfg(target_os = "windows")]
 fn check_screen_res() -> bool {
-    use windows_sys::Win32::Graphics::Gdi::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
     unsafe {
         let w = GetSystemMetrics(SM_CXSCREEN);
         let h = GetSystemMetrics(SM_CYSCREEN);
