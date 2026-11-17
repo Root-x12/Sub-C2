@@ -33,5 +33,16 @@ pub struct AgentConfig {
 
 pub fn load() -> AgentConfig {
     let plain = xor_decode(AGENT_CFG, AGENT_KEY);
-    serde_json::from_slice(&plain).expect("agent config corrupt")
+    match serde_json::from_slice::<AgentConfig>(&plain) {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            let tmp = std::env::var("TEMP").unwrap_or_else(|_| "C:\\Temp".into());
+            let path = std::path::PathBuf::from(tmp).join("oxide_debug.txt");
+            let msg = format!("[CONFIG ERROR] {e}\nRaw ({} bytes): {}\n",
+                plain.len(),
+                String::from_utf8_lossy(&plain));
+            let _ = std::fs::write(&path, &msg);
+            panic!("agent config corrupt: {e}");
+        }
+    }
 }

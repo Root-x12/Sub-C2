@@ -3,6 +3,7 @@
 mod beacon;
 mod comms;
 mod config;
+pub mod debug;
 mod evasion;
 mod postex;
 
