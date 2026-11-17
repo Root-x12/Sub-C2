@@ -435,6 +435,17 @@ impl App {
                                 ..Default::default()
                             }));
                         }
+                        KeyCode::Char('s') | KeyCode::Char('S') if self.tab == Tab::Listeners => {
+                            if let Some(idx) = self.selected_listener {
+                                if let Some(l) = self.listeners.get(idx) {
+                                    let id = l.config.id;
+                                    let name = l.config.name.clone();
+                                    self.push_log(format!("stopping listener: {name}"));
+                                    self.send_op(OpMessage::StopListener { id }).await;
+                                    self.send_op(OpMessage::ListListeners).await;
+                                }
+                            }
+                        }
                         KeyCode::Char('g') | KeyCode::Char('G') if self.tab == Tab::Build => {
                             self.modal = Some(Modal::GenPayload(PayloadDraft::default()));
                         }
