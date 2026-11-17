@@ -67,17 +67,23 @@ async fn compile(opts: BuildOptions, build_id: &str) -> anyhow::Result<String> {
     let workspace = workspace_root();
     let cipher_hex = hex::encode(cipher_key);
 
-    let (target_flag, out_ext) = if opts.format == oxide_common::types::PayloadFormat::Dll {
-        ("--lib", "dll")
+    let is_dll = opts.format == oxide_common::types::PayloadFormat::Dll;
+    let out_ext = if is_dll { "dll" } else { "exe" };
+
+    let mut cargo_args = vec![
+        "build", "--release",
+        "--target", "x86_64-pc-windows-gnu",
+        "-p", "oxide-agent",
+    ];
+    if is_dll {
+        cargo_args.push("--lib");
     } else {
-        ("--bin oxide-agent", "exe")
-    };
+        cargo_args.push("--bin");
+        cargo_args.push("oxide-agent");
+    }
 
     let status = std::process::Command::new(&cargo)
-        .args(["build", "--release",
-               "--target", "x86_64-pc-windows-gnu",
-               "-p", "oxide-agent",
-               target_flag])
+        .args(&cargo_args)
         .env("OXIDE_OUT_DIR",      tmp.to_str().unwrap())
         .env("OXIDE_BUILD_ID",     build_id)
         .env("OXIDE_CIPHER_KEY",   &cipher_hex)
