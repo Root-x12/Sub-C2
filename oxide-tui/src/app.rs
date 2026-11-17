@@ -220,7 +220,7 @@ pub struct App {
 impl App {
     pub fn new(ws_tx: mpsc::Sender<OpMessage>) -> Self {
         App {
-            tab: Tab::Dashboard,
+            tab: Tab::Agents,
             agents: Vec::new(),
             listeners: Vec::new(),
             loot: Vec::new(),
