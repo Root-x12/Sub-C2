@@ -9,7 +9,7 @@ mod debug;
 mod evasion;
 mod postex;
 
-#[tokio::main(flavor = "current_thread")]
+#[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dbg_log!("=== OXIDE agent starting ===");
 
