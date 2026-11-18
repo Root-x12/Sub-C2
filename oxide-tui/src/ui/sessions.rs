@@ -20,27 +20,38 @@ pub fn draw(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_agent_list(f: &mut Frame, app: &mut App, area: Rect) {
+    let now = chrono::Utc::now();
     let items: Vec<ListItem> = app.agents.iter().enumerate().map(|(i, a)| {
         let dot_color = match a.status {
             AgentStatus::Active => C_OK,
             AgentStatus::Stale  => C_WARN,
             AgentStatus::Dead   => C_DIM,
         };
+        let dot_sym = match a.status {
+            AgentStatus::Active => "● ",
+            AgentStatus::Stale  => "◐ ",
+            AgentStatus::Dead   => "○ ",
+        };
         let (priv_tag, priv_color) = match a.privilege {
             Privilege::System => ("SYS", C_DANGER),
             Privilege::Admin  => ("ADM", C_WARN),
             Privilege::User   => ("USR", C_FG),
         };
-        let hist_count = app.agent_history.get(&a.id).map(|h| h.len()).unwrap_or(0);
+        let elapsed_s = (now - a.last_seen).num_seconds().max(0);
+        let age_str = if elapsed_s < 60 {
+            format!("{elapsed_s}s")
+        } else {
+            format!("{}m", elapsed_s / 60)
+        };
         Line::from(vec![
             Span::styled(format!(" {:>2} ", i + 1), Style::default().fg(C_DIM)),
-            Span::styled("● ", Style::default().fg(dot_color)),
+            Span::styled(dot_sym, Style::default().fg(dot_color)),
             Span::styled(
                 format!("{:<12}", &a.hostname),
                 Style::default().fg(C_FG).add_modifier(Modifier::BOLD),
             ),
             Span::styled(priv_tag, Style::default().fg(priv_color)),
-            Span::styled(format!(" {hist_count}"), Style::default().fg(C_DIM)),
+            Span::styled(format!(" {age_str}"), Style::default().fg(C_DIM)),
         ])
     }).map(ListItem::new).collect();
 
@@ -67,6 +78,7 @@ fn draw_agent_list(f: &mut Frame, app: &mut App, area: Rect) {
 }
 
 fn draw_session_log(f: &mut Frame, app: &App, area: Rect) {
+    let now = chrono::Utc::now();
     let splits = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(1)])
@@ -75,16 +87,22 @@ fn draw_session_log(f: &mut Frame, app: &App, area: Rect) {
     let (title, lines) = if let Some(idx) = app.selected_agent {
         if let Some(agent) = app.agents.get(idx) {
             let hist = app.agent_history.get(&agent.id);
-            let title = format!(" {} @ {} — Session Log ", agent.hostname, agent.ip);
+            let elapsed_s = (now - agent.last_seen).num_seconds().max(0);
+            let status_tag = match agent.status {
+                AgentStatus::Active => format!("ACTIVE  last seen {elapsed_s}s ago"),
+                AgentStatus::Stale  => format!("STALE   last seen {elapsed_s}s ago"),
+                AgentStatus::Dead   => format!("DEAD    last seen {elapsed_s}s ago"),
+            };
+            let title = format!(" {} @ {}  [{}] ", agent.hostname, agent.ip, status_tag);
 
             let all_lines: Vec<&String> = hist.map(|h| h.iter().collect()).unwrap_or_default();
             let visible_h = splits[0].height.saturating_sub(2) as usize;
             let total = all_lines.len();
-            let end = total; // show most recent (no scroll offset here — this is the log view)
+            let end = total;
             let start = end.saturating_sub(visible_h);
             let visible = &all_lines[start..end];
 
-            let items: Vec<Line> = visible.iter().map(|msg| {
+            let mut items: Vec<Line> = visible.iter().map(|msg| {
                 let color = if msg.contains("→ ") {
                     C_ACCENT
                 } else if msg.contains("← ") || msg.contains("● Connected") {
@@ -98,6 +116,15 @@ fn draw_session_log(f: &mut Frame, app: &App, area: Rect) {
                 };
                 Line::from(Span::styled(*msg, Style::default().fg(color)))
             }).collect();
+
+            // Warn user if agent looks dead but commands are still pending
+            if matches!(agent.status, AgentStatus::Stale | AgentStatus::Dead) {
+                items.push(Line::from(Span::styled(
+                    format!("  ⚠ Agent {}: check if it is still running (last seen {elapsed_s}s ago)",
+                        if matches!(agent.status, AgentStatus::Dead) { "DEAD" } else { "STALE" }),
+                    Style::default().fg(C_WARN),
+                )));
+            }
 
             (title, items)
         } else {

@@ -146,7 +146,7 @@ unsafe fn get_image_base() -> *const u8 {
     // Walk the PEB to find this module's ImageBase
     use windows_sys::Win32::System::Threading::GetCurrentProcess;
     // Simple: use the address of this function and walk back to MZ header
-    let mut addr = get_image_base as usize;
+    let mut addr = get_image_base as *const () as usize;
     addr &= !0xFFF; // page align
     for _ in 0..0x200 {
         if *(addr as *const u16) == 0x5A4D { // MZ
