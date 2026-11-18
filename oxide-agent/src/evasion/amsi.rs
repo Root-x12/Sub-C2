@@ -20,7 +20,7 @@ pub fn patch() {
         let mut old_protect = 0u32;
         windows_sys::Win32::System::Memory::VirtualProtect(
             addr as _,
-            2,
+            4,
             windows_sys::Win32::System::Memory::PAGE_EXECUTE_READWRITE,
             &mut old_protect,
         );
@@ -33,7 +33,7 @@ pub fn patch() {
 
         windows_sys::Win32::System::Memory::VirtualProtect(
             addr as _,
-            2,
+            4,
             old_protect,
             &mut old_protect,
         );

