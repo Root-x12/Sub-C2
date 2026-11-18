@@ -1,3 +1,7 @@
+// Hide the console window when running on Windows
+#![cfg_attr(windows, windows_subsystem = "windows")]
+#![allow(dead_code, unused_imports, unused_variables)]
+
 mod beacon;
 mod comms;
 mod config;

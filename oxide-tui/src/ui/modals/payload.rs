@@ -3,7 +3,7 @@
 
 use crate::app::{App, PayloadDraft};
 use crate::ui::modals::centered_rect;
-use crate::ui::{C_ACCENT, C_BORDER, C_DANGER, C_DIM, C_FG, C_OK, C_WARN};
+use crate::ui::{C_ACCENT, C_DANGER, C_DIM, C_FG, C_OK, C_WARN};
 use oxide_common::types::BuildOptions;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},

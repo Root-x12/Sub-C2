@@ -8,10 +8,12 @@ use tokio::sync::{broadcast, RwLock};
 use uuid::Uuid;
 
 /// Per-agent channel: server pushes task results to subscribed operators.
+#[allow(dead_code)]
 pub type AgentTx = broadcast::Sender<SrvMessage>;
 
 pub struct Inner {
     pub config:    ServerConfig,
+    #[allow(dead_code)]
     pub db:        SqlitePool,
     pub agents:    HashMap<Uuid, AgentInfo>,
     pub listeners: HashMap<Uuid, ListenerInfo>,
@@ -76,11 +78,13 @@ impl AppState {
             .collect()
     }
 
+    #[allow(dead_code)]
     pub async fn add_loot(&self, entry: LootEntry) {
         let mut inner = self.0.write().await;
         inner.loot.push(entry);
     }
 
+    #[allow(dead_code)]
     pub async fn listener_online(&self, info: ListenerInfo) {
         let mut inner = self.0.write().await;
         inner.listeners.insert(info.config.id, info);

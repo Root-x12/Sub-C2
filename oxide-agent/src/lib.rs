@@ -1,4 +1,5 @@
 //! OXIDE Agent — DLL (cdylib) entry point for reflective injection.
+#![allow(dead_code, unused_imports, unused_variables)]
 
 mod beacon;
 mod comms;

@@ -16,7 +16,6 @@ pub fn draw(f: &mut Frame, app: &App, modal: &Modal, area: Rect) {
 
 fn draw_confirm(f: &mut Frame, message: &str, action: &str, area: Rect) {
     use ratatui::{
-        layout::{Constraint, Direction, Layout},
         style::{Color, Modifier, Style},
         text::{Line, Span},
         widgets::{Block, Borders, Clear, Paragraph},

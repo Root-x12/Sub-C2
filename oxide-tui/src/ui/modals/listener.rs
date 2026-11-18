@@ -1,6 +1,6 @@
 use crate::app::ListenerDraft;
 use crate::ui::modals::centered_rect;
-use crate::ui::{C_ACCENT, C_BORDER, C_DIM, C_FG};
+use crate::ui::{C_ACCENT, C_DIM, C_FG};
 use ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},

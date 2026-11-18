@@ -18,7 +18,7 @@ fn main() {
     let build_id = std::env::var("OXIDE_BUILD_ID").unwrap_or_else(|_| "dev".into());
 
     // ── Cipher key forwarded to oxide-macros ─────────────────────────────────
-    let cipher_key = std::env::var("OXIDE_CIPHER_KEY")
+    let _cipher_key = std::env::var("OXIDE_CIPHER_KEY")
         .unwrap_or_else(|_| "00".repeat(32));
     // The env var is already set for proc macros — no extra action needed here.
 

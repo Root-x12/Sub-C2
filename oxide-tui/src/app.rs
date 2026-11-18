@@ -24,6 +24,7 @@ impl Tab {
     pub fn all() -> &'static [Tab] {
         &[Tab::Dashboard, Tab::Agents, Tab::Listeners, Tab::Sessions, Tab::Loot, Tab::Build]
     }
+    #[allow(dead_code)]
     pub fn title(&self) -> &'static str {
         match self {
             Tab::Dashboard => " [1] Dashboard ",
@@ -46,6 +47,7 @@ pub enum Modal {
     NewListener(ListenerDraft),
     GenPayload(PayloadDraft),
     AgentInteract { agent_id: Uuid, input: String },
+    #[allow(dead_code)]
     Confirm { message: String, action: String },
 }
 
@@ -173,6 +175,7 @@ impl PayloadDraft {
 
 #[derive(Debug, Clone)]
 pub struct GraphNode {
+    #[allow(dead_code)]
     pub id:    Option<Uuid>,
     pub label: String,
     pub x:     f64,
@@ -199,6 +202,7 @@ pub struct App {
     pub selected_agent:     Option<usize>,
     pub selected_listener:  Option<usize>,
     pub selected_loot:      Option<usize>,
+    #[allow(dead_code)]
     pub command_input:      String,
     pub build_status:       Option<String>,
     pub ws_tx:              mpsc::Sender<OpMessage>,
@@ -749,8 +753,8 @@ impl App {
                         let cmd_str = input.trim().to_string();
                         *input = String::new();
                         // drop borrow on self.modal fields before accessing cmd_history etc.
-                        drop(input);
-                        drop(agent_id);
+                        let _ = input;
+                        let _ = agent_id;
 
                         if !cmd_str.is_empty() {
                             // Store in cmd history

