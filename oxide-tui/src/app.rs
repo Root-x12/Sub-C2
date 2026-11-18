@@ -202,6 +202,7 @@ pub struct App {
     pub command_input:      String,
     pub build_status:       Option<String>,
     pub ws_tx:              mpsc::Sender<OpMessage>,
+    pub ws_connected:       bool,
     // Per-agent command/result history for the Sessions tab and interact modal
     pub agent_history:      HashMap<Uuid, VecDeque<String>>,
     // Interact modal scroll: 0 = bottom (newest), higher = scrolled up (older)
@@ -240,6 +241,7 @@ impl App {
             command_input:     String::new(),
             build_status:      None,
             ws_tx,
+            ws_connected:         false,
             agent_history:        HashMap::new(),
             interact_scroll:      0,
             cmd_history:          Vec::new(),
@@ -255,7 +257,9 @@ impl App {
     }
 
     pub async fn send_op(&self, op: OpMessage) {
-        let _ = self.ws_tx.send(op).await;
+        if self.ws_tx.send(op).await.is_err() {
+            // Channel closed — WS died; reconnect loop in main.rs will handle it
+        }
     }
 
     pub fn tick(&mut self) {
@@ -318,8 +322,10 @@ impl App {
                 self.push_log(format!("agent dead: {}", agent_id));
             }
             SrvMessage::TaskResult { result } => {
-                // Resolve the agent_id: use the one in the result (server fills it in),
-                // or fall back to our task→agent map if the result still carries nil.
+                self.push_log(format!(
+                    "← result task={} agent={} out={}b err={:?}",
+                    result.task_id, result.agent_id, result.output.len(), result.error
+                ));
                 let agent_id = if result.agent_id != Uuid::nil() {
                     result.agent_id
                 } else {

@@ -82,8 +82,15 @@ fn draw_tabs(f: &mut Frame, app: &App, area: Rect) {
     let inactive_sty = Style::default().fg(C_DIM);
     let sep_sty      = Style::default().fg(C_BORDER);
 
+    let (conn_sym, conn_sty) = if app.ws_connected {
+        ("● ", Style::default().fg(C_OK))
+    } else {
+        ("○ ", Style::default().fg(C_DANGER).add_modifier(Modifier::BOLD))
+    };
+
     let mut spans: Vec<Span> = vec![
         Span::styled("  ◈ OXIDE  ", Style::default().fg(C_SELECT).add_modifier(Modifier::BOLD)),
+        Span::styled(conn_sym, conn_sty),
         Span::styled("│", sep_sty),
     ];
 
@@ -116,8 +123,14 @@ fn draw_statusbar(f: &mut Frame, app: &App, area: Rect) {
         String::new()
     };
 
+    let (srv_dot, srv_sty) = if app.ws_connected {
+        ("● server  ", Style::default().fg(C_OK))
+    } else {
+        ("○ DISCONNECTED  ", Style::default().fg(C_DANGER).add_modifier(Modifier::BOLD))
+    };
+
     let line = Line::from(vec![
-        Span::styled("  ● ", Style::default().fg(C_OK)),
+        Span::styled(srv_dot, srv_sty),
         Span::styled(format!("{active}/{agents}"), Style::default().fg(C_OK).add_modifier(Modifier::BOLD)),
         Span::styled(" agents  ", Style::default().fg(C_DIM)),
         Span::styled("◉ ", Style::default().fg(C_ACCENT)),
