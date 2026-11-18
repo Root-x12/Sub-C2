@@ -91,12 +91,17 @@ async fn handle_beacon(
     // Push results to operators (fill in agent_id from URL path)
     for mut result in beacon.results {
         result.agent_id = agent_id;
+        info!("task result: task={} agent={} output_bytes={} err={:?}",
+            result.task_id, agent_id, result.output.len(), result.error);
         let _ = state.0.read().await.broadcast
             .send(SrvMessage::TaskResult { result });
     }
 
     // Return pending tasks
     let tasks = state.drain_tasks(&agent_id).await;
+    if !tasks.is_empty() {
+        info!("dispatching {} tasks to agent {}", tasks.len(), agent_id);
+    }
     let resp = BeaconResponse {
         tasks,
         kill: false,
