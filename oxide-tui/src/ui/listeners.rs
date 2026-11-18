@@ -50,6 +50,7 @@ fn draw_list(f: &mut Frame, app: &mut App, area: Rect) {
         let (dot, _dot_color) = match &l.status {
             ListenerStatus::Running  => ("◉", C_OK),
             ListenerStatus::Stopped  => ("○", C_DIM),
+            ListenerStatus::Disabled => ("⊘", C_WARN),
             ListenerStatus::Error(_) => ("✕", C_DANGER),
         };
         let num = real_idx + 1;
@@ -83,9 +84,10 @@ fn draw_detail(f: &mut Frame, app: &App, area: Rect) {
 
     if let Some(l) = listener {
         let (status_str, status_color) = match &l.status {
-            ListenerStatus::Running  => ("RUNNING", C_OK),
-            ListenerStatus::Stopped  => ("STOPPED", C_DIM),
-            ListenerStatus::Error(_) => ("ERROR",   C_DANGER),
+            ListenerStatus::Running  => ("RUNNING",  C_OK),
+            ListenerStatus::Stopped  => ("STOPPED",  C_DIM),
+            ListenerStatus::Disabled => ("DISABLED", C_WARN),
+            ListenerStatus::Error(_) => ("ERROR",    C_DANGER),
         };
         let error_line = match &l.status {
             ListenerStatus::Error(e) => Some(e.clone()),
@@ -153,7 +155,7 @@ fn draw_detail(f: &mut Frame, app: &App, area: Rect) {
                 Span::styled("[N]", Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD)),
                 Span::styled(" new   ", Style::default().fg(C_DIM)),
                 Span::styled("[S]", Style::default().fg(C_WARN).add_modifier(Modifier::BOLD)),
-                Span::styled(" stop selected   ", Style::default().fg(C_DIM)),
+                Span::styled(" disable selected   ", Style::default().fg(C_DIM)),
                 Span::styled("[↑↓]", Style::default().fg(C_ACCENT).add_modifier(Modifier::BOLD)),
                 Span::styled(" select", Style::default().fg(C_DIM)),
             ]),

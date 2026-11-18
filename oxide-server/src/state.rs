@@ -93,7 +93,7 @@ impl AppState {
     pub async fn listener_offline(&self, id: Uuid) {
         let mut inner = self.0.write().await;
         if let Some(l) = inner.listeners.get_mut(&id) {
-            l.status = ListenerStatus::Stopped;
+            l.status = ListenerStatus::Disabled;
         }
     }
 }

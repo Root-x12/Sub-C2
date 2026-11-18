@@ -21,7 +21,7 @@ impl Manager {
                     let inner = self.state.0.read().await;
                     inner.listeners
                         .values()
-                        .filter(|l| l.status == ListenerStatus::Stopped)
+                        .filter(|l| l.status == ListenerStatus::Stopped) // Disabled is not restarted
                         .map(|l| l.config.clone())
                         .collect::<Vec<_>>()
                 };

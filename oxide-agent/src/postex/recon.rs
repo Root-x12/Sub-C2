@@ -123,7 +123,10 @@ pub async fn portscan(args: &[String]) -> Result<String> {
 
 pub async fn screenshot() -> Result<String> {
     #[cfg(target_os = "windows")]
-    return screenshot_windows();
+    return tokio::task::spawn_blocking(screenshot_windows)
+        .await
+        .map_err(|e| anyhow::anyhow!("spawn_blocking: {e}"))
+        .and_then(|r| r);
     #[cfg(not(target_os = "windows"))]
     Ok("screenshot not supported on this platform".into())
 }
@@ -139,9 +142,15 @@ fn screenshot_windows() -> Result<String> {
     unsafe {
         let w = GetSystemMetrics(SM_CXSCREEN);
         let h = GetSystemMetrics(SM_CYSCREEN);
+        if w <= 0 || h <= 0 {
+            return Err(anyhow::anyhow!("invalid screen dimensions {}x{}", w, h));
+        }
         let dc  = GetDC(0);
+        if dc == 0 { return Err(anyhow::anyhow!("GetDC failed")); }
         let mdc = CreateCompatibleDC(dc);
+        if mdc == 0 { ReleaseDC(0, dc); return Err(anyhow::anyhow!("CreateCompatibleDC failed")); }
         let bmp = CreateCompatibleBitmap(dc, w, h);
+        if bmp == 0 { DeleteDC(mdc); ReleaseDC(0, dc); return Err(anyhow::anyhow!("CreateCompatibleBitmap failed")); }
         SelectObject(mdc, bmp);
         BitBlt(mdc, 0, 0, w, h, dc, 0, 0, SRCCOPY);
 

@@ -114,6 +114,7 @@ pub struct ListenerConfig {
 pub enum ListenerStatus {
     Running,
     Stopped,
+    Disabled, // manually stopped by operator — manager will not auto-restart
     Error(String),
 }
 
@@ -122,6 +123,7 @@ impl fmt::Display for ListenerStatus {
         match self {
             ListenerStatus::Running    => write!(f, "RUNNING"),
             ListenerStatus::Stopped    => write!(f, "STOPPED"),
+            ListenerStatus::Disabled   => write!(f, "DISABLED"),
             ListenerStatus::Error(e)   => write!(f, "ERROR: {e}"),
         }
     }
