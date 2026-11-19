@@ -77,14 +77,23 @@ async fn run<B: ratatui::backend::Backend>(
     let mut app = app::App::new(ws_tx);
     app.ws_connected = true;
 
+    // Initialize tachyonfx effect engine
+    let mut fx_engine = ui::effects::FxEngine::new();
+
     initial_fetch(&app).await;
 
     let mut event_stream = crossterm::event::EventStream::new();
-    let mut ticker = tokio::time::interval(std::time::Duration::from_millis(500));
+
+    // ── Frame rate: 30fps for smooth tachyonfx animations ────────────
+    let mut ticker = tokio::time::interval(std::time::Duration::from_millis(33));
+
+    // Tick counter for beacon history (every ~1 second = 30 frames)
+    let mut frame_count: u64 = 0;
+
     use futures::StreamExt;
 
     loop {
-        term.draw(|f| ui::draw(f, &mut app))?;
+        term.draw(|f| ui::draw(f, &mut app, &mut fx_engine))?;
 
         tokio::select! {
             Some(Ok(evt)) = event_stream.next() => {
@@ -102,7 +111,7 @@ async fn run<B: ratatui::backend::Backend>(
                         // WebSocket dropped — reconnect
                         app.ws_connected = false;
                         app.push_log("⚠ server disconnected — reconnecting…");
-                        term.draw(|f| ui::draw(f, &mut app))?;
+                        term.draw(|f| ui::draw(f, &mut app, &mut fx_engine))?;
 
                         let (new_tx, new_rx) = connect_with_retry(addr, token).await;
                         ws_rx = new_rx;
@@ -115,7 +124,11 @@ async fn run<B: ratatui::backend::Backend>(
             }
 
             _ = ticker.tick() => {
-                app.tick();
+                frame_count += 1;
+                // Run app tick logic every ~30 frames (~1 second)
+                if frame_count % 30 == 0 {
+                    app.tick();
+                }
             }
         }
     }
