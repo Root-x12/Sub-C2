@@ -22,22 +22,34 @@ impl HttpTransport {
     }
 
     pub async fn register(&self, reg: &AgentRegister) -> Result<()> {
-        self.client
-            .post(format!("{}/register", self.base_url))
+        let url = format!("{}/register", self.base_url);
+        crate::dbg_log!("HTTP POST {url}");
+        let resp = self.client
+            .post(&url)
             .json(reg)
             .send()
-            .await?
-            .error_for_status()?;
+            .await;
+        match &resp {
+            Ok(r) => crate::dbg_log!("HTTP register response: status={}", r.status()),
+            Err(e) => crate::dbg_log!("HTTP register FAILED: {e}"),
+        }
+        resp?.error_for_status()?;
         Ok(())
     }
 
     pub async fn beacon(&self, b: &AgentBeacon) -> Result<BeaconResponse> {
+        let url = format!("{}/beacon/{}", self.base_url, self.agent_id);
+        crate::dbg_log!("HTTP POST {url}");
         let resp = self.client
-            .post(format!("{}/beacon/{}", self.base_url, self.agent_id))
+            .post(&url)
             .json(b)
             .send()
-            .await?
-            .error_for_status()?;
-        Ok(resp.json().await?)
+            .await;
+        match &resp {
+            Ok(r) => crate::dbg_log!("HTTP beacon response: status={}", r.status()),
+            Err(e) => crate::dbg_log!("HTTP beacon FAILED: {e}"),
+        }
+        let r = resp?.error_for_status()?;
+        Ok(r.json().await?)
     }
 }

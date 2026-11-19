@@ -2,11 +2,20 @@
 
 #[cfg(target_os = "windows")]
 pub fn is_sandbox() -> bool {
-    check_process_count()
-        || check_uptime()
-        || check_known_bad_artifacts()
-        || check_debugger()
-        || check_screen_res()
+    let proc   = check_process_count();
+    crate::dbg_log!("  sandbox: process_count  => {proc} (true = too few processes, looks like sandbox)");
+    let uptime = check_uptime();
+    crate::dbg_log!("  sandbox: uptime         => {uptime} (true = booted < 5min ago)");
+    let artifacts = check_known_bad_artifacts();
+    crate::dbg_log!("  sandbox: bad_artifacts  => {artifacts} (true = hostname/username matches sandbox pattern)");
+    let debugger = check_debugger();
+    crate::dbg_log!("  sandbox: debugger       => {debugger} (true = debugger attached)");
+    let screen = check_screen_res();
+    crate::dbg_log!("  sandbox: screen_res     => {screen} (true = resolution < 800x600)");
+
+    let result = proc || uptime || artifacts || debugger || screen;
+    crate::dbg_log!("  sandbox: VERDICT        => {result} (true = sandbox detected, will exit)");
+    result
 }
 
 #[cfg(not(target_os = "windows"))]
