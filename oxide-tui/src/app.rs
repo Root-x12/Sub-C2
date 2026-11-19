@@ -97,7 +97,7 @@ impl Default for PayloadDraft {
             sleep_ms:      "5000".into(),
             jitter_pct:    "10".into(),
             output_path:   "/tmp/agent.exe".into(),
-            sleep_obf_idx: 0,
+            sleep_obf_idx: 1,          // Ekko by default
             injection_idx: 0,
             amsi:          true,
             etw:           true,
