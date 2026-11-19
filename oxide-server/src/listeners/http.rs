@@ -3,7 +3,7 @@
 use crate::state::AppState;
 use axum::{
     body::Bytes,
-    extract::{Path, State},
+    extract::{DefaultBodyLimit, Path, State},
     http::StatusCode,
     response::IntoResponse,
     routing::post,
@@ -21,6 +21,7 @@ pub async fn run(cfg: ListenerConfig, state: AppState) -> anyhow::Result<()> {
     let router = Router::new()
         .route("/register", post(handle_register))
         .route("/beacon/:agent_id", post(handle_beacon))
+        .layer(DefaultBodyLimit::max(50 * 1024 * 1024)) // 50 MB — screenshots can be ~15 MB
         .with_state(state);
 
     // Always bind on all interfaces; cfg.host is the advertised address for agents
