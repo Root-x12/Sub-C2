@@ -28,8 +28,8 @@ pub struct FxEngine {
     pub last_frame: Instant,
     /// Startup sweep effect for entire screen
     pub startup_fx: Option<Effect>,
-    /// Scan line effect — a subtle horizontal line that scrolls down
-    pub scanline: Effect,
+    /// Content area ambient flicker — subtle dissolve cycle
+    pub ambient_flicker: Effect,
 }
 
 impl FxEngine {
@@ -43,7 +43,7 @@ impl FxEngine {
             had_modal: false,
             last_frame: Instant::now(),
             startup_fx: Some(Self::make_startup_effect()),
-            scanline: Self::make_scanline(),
+            ambient_flicker: Self::make_ambient_flicker(),
         }
     }
 
@@ -94,35 +94,15 @@ impl FxEngine {
         )
     }
 
-    /// Scanline effect — subtle rolling scan line
-    fn make_scanline() -> Effect {
+    /// Ambient flicker — subtle HSL lightness oscillation on content area
+    fn make_ambient_flicker() -> Effect {
         fx::never_complete(
             fx::repeating(
-                fx::effect_fn(
-                    0u32, // state: current scan line position
-                    FxDuration::from_millis(100), // cycle every 100ms
-                    |scan_pos, ctx, cell_iter| {
-                        let area = ctx.area;
-                        let line = (*scan_pos % area.height as u32) as u16;
-                        *scan_pos = scan_pos.wrapping_add(1);
-
-                        for (pos, cell) in cell_iter {
-                            let row = pos.y.saturating_sub(area.y);
-                            if row == line {
-                                // Brighten the scan line slightly
-                                let (r, g, b) = match cell.fg {
-                                    Color::Rgb(r, g, b) => (r, g, b),
-                                    _ => continue,
-                                };
-                                let boost = 25u8;
-                                cell.set_fg(Color::Rgb(
-                                    r.saturating_add(boost),
-                                    g.saturating_add(boost),
-                                    b.saturating_add(boost),
-                                ));
-                            }
-                        }
-                    },
+                fx::ping_pong(
+                    fx::hsl_shift_fg(
+                        [0.0, 0.0, 3.0],  // very subtle lightness shift
+                        (3000, Interpolation::SineInOut),
+                    )
                 )
             )
         )
@@ -211,8 +191,8 @@ impl FxEngine {
         // ── Status bar pulse (always running) ────────────────────────────
         f.render_effect(&mut self.statusbar_pulse, statusbar_area, dt);
 
-        // ── Scan line (always running, subtle) ───────────────────────────
-        f.render_effect(&mut self.scanline, content_area, dt);
+        // ── Ambient flicker (always running, subtle) ────────────────────
+        f.render_effect(&mut self.ambient_flicker, content_area, dt);
     }
 }
 
