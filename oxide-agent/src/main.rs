@@ -11,6 +11,14 @@ mod postex;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Write crash info to a temp file so silent panics are diagnosable
+    #[cfg(target_os = "windows")]
+    std::panic::set_hook(Box::new(|info| {
+        let tmp = std::env::var("TEMP").unwrap_or_else(|_| "C:\\Temp".into());
+        let msg = format!("[OXIDE PANIC] {info}\n");
+        let _ = std::fs::write(format!("{tmp}\\oxide_panic.txt"), msg);
+    }));
+
     dbg_log!("=== OXIDE agent starting ===");
 
     dbg_log!("loading config...");

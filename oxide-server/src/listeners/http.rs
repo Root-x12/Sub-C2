@@ -79,7 +79,7 @@ async fn handle_beacon(
     };
 
     // Update last_seen and broadcast AgentUpdate so the TUI sparkline/graph reflects live beacons
-    let updated_agent = {
+    let known_agent = {
         let mut inner = state.0.write().await;
         if let Some(a) = inner.agents.get_mut(&agent_id) {
             a.last_seen = Utc::now();
@@ -90,18 +90,24 @@ async fn handle_beacon(
             None
         }
     };
-    if let Some(agent) = updated_agent {
+    if let Some(agent) = known_agent.clone() {
         let _ = state.0.read().await.broadcast
             .send(oxide_common::protocol::SrvMessage::AgentUpdate { agent });
     }
 
-    // Push results to operators (fill in agent_id from URL path)
+    // Push results to operators (fill in agent_id from URL path; always forward even for unknown agents)
     for mut result in beacon.results {
         result.agent_id = agent_id;
         info!("task result: task={} agent={} output_bytes={} err={:?}",
             result.task_id, agent_id, result.output.len(), result.error);
         let _ = state.0.read().await.broadcast
             .send(SrvMessage::TaskResult { result });
+    }
+
+    // Unknown agent (evicted by heartbeat or server restart) — tell it to re-register
+    if known_agent.is_none() {
+        info!("unknown agent {agent_id} beaconed — returning 404 to trigger re-registration");
+        return (StatusCode::NOT_FOUND, Bytes::new());
     }
 
     // Return pending tasks

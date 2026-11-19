@@ -65,8 +65,8 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Every 15 seconds: advance missed_beats, mark Stale after 3 misses,
-/// evict and broadcast AgentDead after 10 misses.
+/// Every 15 seconds: advance missed_beats, mark Stale after 5 misses,
+/// evict and broadcast AgentDead after 20 misses.
 async fn heartbeat_check(state: &state::AppState) {
     let now = chrono::Utc::now();
     let mut to_dead: Vec<Uuid> = Vec::new();
@@ -81,13 +81,13 @@ async fn heartbeat_check(state: &state::AppState) {
             agent.missed_beats = missed as u32;
 
             match agent.status {
-                AgentStatus::Active if missed >= 3 => {
+                AgentStatus::Active if missed >= 5 => {
                     agent.status = AgentStatus::Stale;
                     info!("agent {} ({}) went STALE ({}ms since last beacon)",
                         agent.hostname, id, elapsed_ms);
                     to_broadcast.push(SrvMessage::AgentUpdate { agent: agent.clone() });
                 }
-                AgentStatus::Stale if missed >= 10 => {
+                AgentStatus::Stale if missed >= 20 => {
                     info!("agent {} ({}) declared DEAD ({}ms)", agent.hostname, id, elapsed_ms);
                     to_dead.push(*id);
                 }
